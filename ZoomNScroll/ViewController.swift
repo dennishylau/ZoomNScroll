@@ -92,7 +92,6 @@ class ViewController: UIViewController, UIScrollViewDelegate {
 		let scale = min(widthScale, heightScale)
 		scrollView.minimumZoomScale = scale
 		scrollView.zoomScale = scale
-		
 		initScale = scale
 	}
 	
