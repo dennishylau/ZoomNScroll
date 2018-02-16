@@ -9,7 +9,7 @@
 import UIKit
 
 class ViewController: UIViewController, UIScrollViewDelegate {
-
+	
 	@IBOutlet weak var scrollView: UIScrollView!
 	@IBOutlet weak var imageView: UIImageView!
 	@IBOutlet var doubleTapGesture: UITapGestureRecognizer!
@@ -36,39 +36,7 @@ class ViewController: UIViewController, UIScrollViewDelegate {
 		return view.frame.height > view.frame.width
 	}
 	
-	override func viewDidLoad() {
-		super.viewDidLoad()
-		imageView.image = #imageLiteral(resourceName: "iphoneResolution")
-		scrollView.delegate = self
-		// set VC instance as the delegate of scrollView
-		scrollView.alwaysBounceHorizontal = true
-		scrollView.contentInsetAdjustmentBehavior = .never
-		// stop system from setting up safe area affects scrollView zoom in landscape
-		
-		// This is used to force update the imageView frame to match image size
-		imageView.frame.size = (imageView.image?.size)!
-		print("image width: \(imageView.frame.width), image height: \(imageView.frame.height)")
-		initZoomScale(view.frame.size, animated: false)
-		setScrollViewInset()
-	}
-	
-	override func viewDidLayoutSubviews() {
-		// This is the trick. Gets called everytime orientation changes.
-		super.viewDidLayoutSubviews()
-		DispatchQueue.main.async {
-			print("view width:\(self.view.frame.width), view height: \(self.view.frame.height)")
-			if self.currentScale == self.initScale {
-				self.initZoomScale(self.view.frame.size, animated: false)
-			}
-		}
-		setScrollViewInset()
-		view.layoutIfNeeded()
-	}
-	
-	func viewForZooming(in scrollView: UIScrollView) -> UIView? {
-		return imageView
-	}
-	
+	// rotation support setup
 	override var shouldAutorotate: Bool {
 		return true
 	}
@@ -81,16 +49,49 @@ class ViewController: UIViewController, UIScrollViewDelegate {
 		return UIInterfaceOrientation.portrait
 	}
 	
+	// zooming support setup
+	func viewForZooming(in scrollView: UIScrollView) -> UIView? {
+		return imageView
+	}
+	
+	override func viewDidLoad() {
+		super.viewDidLoad()
+		imageView.image = #imageLiteral(resourceName: "iphoneResolution")
+		scrollView.delegate = self
+		// set VC instance as the delegate of scrollView
+		scrollView.alwaysBounceHorizontal = true
+		scrollView.contentInsetAdjustmentBehavior = .never
+		// stop system from setting up safe area affects scrollView zoom in landscape
+		
+		// This is used to force update the imageView frame to match image size
+		if let imageSize = imageView.image?.size {
+			imageView.frame.size = imageSize
+		}
+		print("image width: \(imageView.frame.width), image height: \(imageView.frame.height)")
+		initZoomScale(view.frame.size, animated: false)
+	}
+	
+	override func viewDidLayoutSubviews() {
+		// This is the trick. Gets called everytime orientation changes to set inset.
+		super.viewDidLayoutSubviews()
+		setScrollViewInset()
+		view.layoutIfNeeded()
+	}
+
 	func initZoomScale(_ size: CGSize, animated: Bool) {
+		let scale = getMinScale(for: size)
+		scrollView.minimumZoomScale = scale
+		scrollView.setZoomScale(scale, animated: animated)
+		initScale = scale
+	}
+	
+	func getMinScale(for size: CGSize) -> CGFloat {
 		//		divide screen size by image size
 		let widthScale = size.width / imageView.bounds.width
 		let heightScale = size.height / imageView.bounds.height
 		//		get min of two so entire image will show
 		let scale = min(widthScale, heightScale)
-		scrollView.minimumZoomScale = scale
-//		scrollView.zoomScale = scale
-		scrollView.setZoomScale(scale, animated: animated)
-		initScale = scale
+		return scale
 	}
 	
 	func scrollViewDidZoom(_ scrollView: UIScrollView) {
@@ -106,41 +107,17 @@ class ViewController: UIViewController, UIScrollViewDelegate {
 	}
 	
 	@IBAction func doubleTappedGesture(_ sender: Any) {
+		// remember to use view tap location, as scrollView can give negative numbers
 		let viewTapLocation = doubleTapGesture.location(in: view)
-		let svTapLocation = doubleTapGesture.location(in: scrollView)
 
-		if scrollView.frame.height > scrollView.frame.width {
-			// Portrait
-			if currentScale < fillScale {
+		if currentScale < fillScale {
+			if isInPortrait {
 				scrollView.zoom(to: CGRect(x: imageSize.width * viewTapLocation.x / view.frame.width, y: imageSize.height * viewTapLocation.y / view.frame.height, width: 0, height: imageSize.height), animated: true)
-			} else {
-//				let widthScale = view.frame.width / imageView.bounds.width
-//				let heightScale = view.frame.height / imageView.bounds.height
-//				let scale = min(widthScale, heightScale)
-//				currentScale = scale
-				initZoomScale(view.frame.size, animated: true)
+			} else if !isInPortrait {
+				scrollView.zoom(to: CGRect(x: imageSize.width * viewTapLocation.x / view.frame.width, y: imageSize.height * viewTapLocation.y / view.frame.height, width: imageSize.width, height: 0), animated: true)
 			}
 		} else {
-			// Landscape
-			if currentScale < fillScale {
-				scrollView.zoom(to: CGRect(x: imageSize.width * viewTapLocation.x / view.frame.width, y: imageSize.height * viewTapLocation.y / view.frame.height, width: imageSize.width, height: 0), animated: true)
-				print(imageSize.width)
-				print(svTapLocation.x)
-				print(view.frame.width)
-				
-				print((view.frame.width - imageView.frame.width) / 2)
-				print(viewTapLocation.x)
-				
-				
-			} else {
-//				let widthScale = view.frame.width / imageView.bounds.width
-//				let heightScale = view.frame.height / imageView.bounds.height
-//				let scale = min(widthScale, heightScale)
-//				currentScale = scale
-//				print(imageView.frame.width)
-				
-				initZoomScale(view.frame.size, animated: true)
-			}
+			initZoomScale(view.frame.size, animated: true)
 		}
 	}
 	
@@ -150,22 +127,14 @@ class ViewController: UIViewController, UIScrollViewDelegate {
 
 		// code before transition
 		
-		// set min scale even when imageView is larger than frame
-		let widthScale = size.width / imageView.bounds.width
-		let heightScale = size.height / imageView.bounds.height
-		let scale = min(widthScale, heightScale)
-		scrollView.minimumZoomScale = scale
-		
-		if currentScale == initScale {
+		// return to default zoom when rotated if imageView smaller than frame
+		if view.frame.width >= imageView.frame.width &&
+			view.frame.height >= imageView.frame.height {
 			initZoomScale(size, animated: true)
-		}
-		
-		if isInPortrait && view.frame.width >= imageView.frame.width {
-			initZoomScale(size, animated: true)
-		}
-		
-		if !isInPortrait && view.frame.height >= imageView.frame.height {
-			initZoomScale(size, animated: true)
+		} else {
+			// only set min scale when imageView is larger than frame
+			let scale = getMinScale(for: size)
+			scrollView.minimumZoomScale = scale
 		}
 		
 		coordinator.animate(alongsideTransition: { (vcTransitionCoordinateContext) in
@@ -179,4 +148,3 @@ class ViewController: UIViewController, UIScrollViewDelegate {
 		}
 	}
 }
-
