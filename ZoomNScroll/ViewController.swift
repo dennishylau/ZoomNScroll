@@ -17,17 +17,7 @@ class ViewController: UIViewController, UIScrollViewDelegate {
 	var imageSize: CGSize! {
 		return imageView.image?.size
 	}
-	var initScale: CGFloat {
-		get {
-			let widthScale = view.frame.width / imageView.bounds.width
-			let heightScale = view.frame.height / imageView.bounds.height
-			let initScale = min(widthScale, heightScale)
-			return initScale
-		}
-		set {
-			setScrollViewInset()
-		}
-	}
+	var initScale: CGFloat!
 	var currentScale: CGFloat {
 		get {
 			return scrollView.zoomScale
@@ -122,7 +112,6 @@ class ViewController: UIViewController, UIScrollViewDelegate {
 		let tapLocation = doubleTapGesture.location(in: scrollView)
 
 		if currentScale < fillScale {
-//			currentScale = fillScale
 			scrollView.zoom(to: CGRect(x: imageSize.width * tapLocation.x / view.frame.width, y: imageSize.height * tapLocation.y / view.frame.height, width: 0, height: imageSize.height), animated: true)
 		} else {
 			currentScale = initScale
@@ -135,7 +124,9 @@ class ViewController: UIViewController, UIScrollViewDelegate {
 
 		// code before transition
 		
-		initZoomScale(size)
+		if currentScale == initScale {
+			initZoomScale(size)
+		}
 		
 		coordinator.animate(alongsideTransition: { (vcTransitionCoordinateContext) in
 
