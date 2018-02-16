@@ -37,8 +37,10 @@ class ViewController: UIViewController, UIScrollViewDelegate {
 		super.viewDidLoad()
 		imageView.image = #imageLiteral(resourceName: "iphoneResolution")
 		scrollView.delegate = self
-		scrollView.alwaysBounceHorizontal = true
 		// set VC instance as the delegate of scrollView
+		scrollView.alwaysBounceHorizontal = true
+		scrollView.contentInsetAdjustmentBehavior = .never
+		// stop system from setting up safe area affects scrollView zoom in landscape
 		
 		// This is used to force update the imageView frame to match image size
 		imageView.frame.size = (imageView.image?.size)!
@@ -50,9 +52,11 @@ class ViewController: UIViewController, UIScrollViewDelegate {
 	override func viewDidLayoutSubviews() {
 		// This is the trick. Gets called everytime orientation changes.
 		super.viewDidLayoutSubviews()
-		print("view width:\(view.frame.width), view height: \(view.frame.height)")
-		if currentScale == initScale {
-			initZoomScale(view.frame.size)
+		DispatchQueue.main.async {
+			print("view width:\(self.view.frame.width), view height: \(self.view.frame.height)")
+			if self.currentScale == self.initScale {
+				self.initZoomScale(self.view.frame.size)
+			}
 		}
 		setScrollViewInset()
 		view.layoutIfNeeded()
@@ -92,6 +96,7 @@ class ViewController: UIViewController, UIScrollViewDelegate {
 	func setScrollViewInset() {
 		// make content center when smaller than scroll view
 		if scrollView.frame.height > scrollView.frame.width {
+			// Portrait
 			let offsetX = max((scrollView.frame.width - scrollView.contentSize.width) * 0.5, 0)
 			let offsetY = max((scrollView.frame.height - scrollView.contentSize.height) * 0.5, 0)
 			print(scrollView.frame.width)
@@ -100,21 +105,50 @@ class ViewController: UIViewController, UIScrollViewDelegate {
 			print(scrollView.contentSize.height)
 			self.scrollView.contentInset = UIEdgeInsetsMake(offsetY, offsetX, 0, 0)
 		} else {
+			// Landscape
 			let offsetX = max((scrollView.frame.width - scrollView.contentSize.width) * 0.5, 0)
 			let offsetY = max((scrollView.frame.height - scrollView.contentSize.height) * 0.5, 0)
 
 			// offsetX - 44 for alwaysBounceHorizontal = true
-			self.scrollView.contentInset = UIEdgeInsetsMake(offsetY, offsetX - 44, 0, 0)
+			self.scrollView.contentInset = UIEdgeInsetsMake(offsetY, offsetX, 0, 0)
 		}
 	}
 	
 	@IBAction func doubleTappedGesture(_ sender: Any) {
-		let tapLocation = doubleTapGesture.location(in: scrollView)
+		let viewTapLocation = doubleTapGesture.location(in: view)
+		let svTapLocation = doubleTapGesture.location(in: scrollView)
 
-		if currentScale < fillScale {
-			scrollView.zoom(to: CGRect(x: imageSize.width * tapLocation.x / view.frame.width, y: imageSize.height * tapLocation.y / view.frame.height, width: 0, height: imageSize.height), animated: true)
+		if scrollView.frame.height > scrollView.frame.width {
+			// Portrait
+			if currentScale < fillScale {
+				scrollView.zoom(to: CGRect(x: imageSize.width * viewTapLocation.x / view.frame.width, y: imageSize.height * viewTapLocation.y / view.frame.height, width: 0, height: imageSize.height), animated: true)
+			} else {
+				let widthScale = view.frame.width / imageView.bounds.width
+				let heightScale = view.frame.height / imageView.bounds.height
+				let scale = min(widthScale, heightScale)
+				currentScale = scale
+			}
 		} else {
-			currentScale = initScale
+			// Landscape
+			if currentScale < fillScale {
+				DispatchQueue.main.async {
+					self.scrollView.contentInset = UIEdgeInsets.zero
+				}
+				scrollView.zoom(to: CGRect(x: imageSize.width * viewTapLocation.x / view.frame.width, y: imageSize.height * viewTapLocation.y / view.frame.height, width: imageSize.width, height: 0), animated: true)
+				print(imageSize.width)
+				print(svTapLocation.x)
+				print(view.frame.width)
+				print(imageView.frame.width)
+				print((view.frame.width - imageView.frame.width) / 2)
+				print(viewTapLocation.x)
+				
+				
+			} else {
+				let widthScale = view.frame.width / imageView.bounds.width
+				let heightScale = view.frame.height / imageView.bounds.height
+				let scale = min(widthScale, heightScale)
+				currentScale = scale
+			}
 		}
 	}
 	
