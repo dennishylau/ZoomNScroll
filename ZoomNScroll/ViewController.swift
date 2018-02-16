@@ -32,6 +32,9 @@ class ViewController: UIViewController, UIScrollViewDelegate {
 		let scale = max(widthScale, heightScale)
 		return scale
 	}
+	var isInPortrait: Bool {
+		return view.frame.height > view.frame.width
+	}
 	
 	override func viewDidLoad() {
 		super.viewDidLoad()
@@ -45,7 +48,7 @@ class ViewController: UIViewController, UIScrollViewDelegate {
 		// This is used to force update the imageView frame to match image size
 		imageView.frame.size = (imageView.image?.size)!
 		print("image width: \(imageView.frame.width), image height: \(imageView.frame.height)")
-		initZoomScale(view.frame.size)
+		initZoomScale(view.frame.size, animated: false)
 		setScrollViewInset()
 	}
 	
@@ -55,7 +58,7 @@ class ViewController: UIViewController, UIScrollViewDelegate {
 		DispatchQueue.main.async {
 			print("view width:\(self.view.frame.width), view height: \(self.view.frame.height)")
 			if self.currentScale == self.initScale {
-				self.initZoomScale(self.view.frame.size)
+				self.initZoomScale(self.view.frame.size, animated: false)
 			}
 		}
 		setScrollViewInset()
@@ -78,14 +81,15 @@ class ViewController: UIViewController, UIScrollViewDelegate {
 		return UIInterfaceOrientation.portrait
 	}
 	
-	func initZoomScale(_ size: CGSize) {
+	func initZoomScale(_ size: CGSize, animated: Bool) {
 		//		divide screen size by image size
 		let widthScale = size.width / imageView.bounds.width
 		let heightScale = size.height / imageView.bounds.height
 		//		get min of two so entire image will show
 		let scale = min(widthScale, heightScale)
 		scrollView.minimumZoomScale = scale
-		scrollView.zoomScale = scale
+//		scrollView.zoomScale = scale
+		scrollView.setZoomScale(scale, animated: animated)
 		initScale = scale
 	}
 	
@@ -95,23 +99,10 @@ class ViewController: UIViewController, UIScrollViewDelegate {
 	
 	func setScrollViewInset() {
 		// make content center when smaller than scroll view
-		if scrollView.frame.height > scrollView.frame.width {
-			// Portrait
-			let offsetX = max((scrollView.frame.width - scrollView.contentSize.width) * 0.5, 0)
-			let offsetY = max((scrollView.frame.height - scrollView.contentSize.height) * 0.5, 0)
-			print(scrollView.frame.width)
-			print(scrollView.frame.height)
-			print(scrollView.contentSize.width)
-			print(scrollView.contentSize.height)
-			self.scrollView.contentInset = UIEdgeInsetsMake(offsetY, offsetX, 0, 0)
-		} else {
-			// Landscape
-			let offsetX = max((scrollView.frame.width - scrollView.contentSize.width) * 0.5, 0)
-			let offsetY = max((scrollView.frame.height - scrollView.contentSize.height) * 0.5, 0)
-
-			// offsetX - 44 for alwaysBounceHorizontal = true
-			self.scrollView.contentInset = UIEdgeInsetsMake(offsetY, offsetX, 0, 0)
-		}
+		
+		let offsetX = max((scrollView.frame.width - scrollView.contentSize.width) * 0.5, 0)
+		let offsetY = max((scrollView.frame.height - scrollView.contentSize.height) * 0.5, 0)
+		scrollView.contentInset = UIEdgeInsetsMake(offsetY, offsetX, 0, 0)
 	}
 	
 	@IBAction func doubleTappedGesture(_ sender: Any) {
@@ -123,31 +114,32 @@ class ViewController: UIViewController, UIScrollViewDelegate {
 			if currentScale < fillScale {
 				scrollView.zoom(to: CGRect(x: imageSize.width * viewTapLocation.x / view.frame.width, y: imageSize.height * viewTapLocation.y / view.frame.height, width: 0, height: imageSize.height), animated: true)
 			} else {
-				let widthScale = view.frame.width / imageView.bounds.width
-				let heightScale = view.frame.height / imageView.bounds.height
-				let scale = min(widthScale, heightScale)
-				currentScale = scale
+//				let widthScale = view.frame.width / imageView.bounds.width
+//				let heightScale = view.frame.height / imageView.bounds.height
+//				let scale = min(widthScale, heightScale)
+//				currentScale = scale
+				initZoomScale(view.frame.size, animated: true)
 			}
 		} else {
 			// Landscape
 			if currentScale < fillScale {
-				DispatchQueue.main.async {
-					self.scrollView.contentInset = UIEdgeInsets.zero
-				}
 				scrollView.zoom(to: CGRect(x: imageSize.width * viewTapLocation.x / view.frame.width, y: imageSize.height * viewTapLocation.y / view.frame.height, width: imageSize.width, height: 0), animated: true)
 				print(imageSize.width)
 				print(svTapLocation.x)
 				print(view.frame.width)
-				print(imageView.frame.width)
+				
 				print((view.frame.width - imageView.frame.width) / 2)
 				print(viewTapLocation.x)
 				
 				
 			} else {
-				let widthScale = view.frame.width / imageView.bounds.width
-				let heightScale = view.frame.height / imageView.bounds.height
-				let scale = min(widthScale, heightScale)
-				currentScale = scale
+//				let widthScale = view.frame.width / imageView.bounds.width
+//				let heightScale = view.frame.height / imageView.bounds.height
+//				let scale = min(widthScale, heightScale)
+//				currentScale = scale
+//				print(imageView.frame.width)
+				
+				initZoomScale(view.frame.size, animated: true)
 			}
 		}
 	}
@@ -158,8 +150,22 @@ class ViewController: UIViewController, UIScrollViewDelegate {
 
 		// code before transition
 		
+		// set min scale even when imageView is larger than frame
+		let widthScale = size.width / imageView.bounds.width
+		let heightScale = size.height / imageView.bounds.height
+		let scale = min(widthScale, heightScale)
+		scrollView.minimumZoomScale = scale
+		
 		if currentScale == initScale {
-			initZoomScale(size)
+			initZoomScale(size, animated: true)
+		}
+		
+		if isInPortrait && view.frame.width >= imageView.frame.width {
+			initZoomScale(size, animated: true)
+		}
+		
+		if !isInPortrait && view.frame.height >= imageView.frame.height {
+			initZoomScale(size, animated: true)
 		}
 		
 		coordinator.animate(alongsideTransition: { (vcTransitionCoordinateContext) in
