@@ -35,6 +35,7 @@ class ViewController: UIViewController, UIScrollViewDelegate {
 	var isInPortrait: Bool {
 		return view.frame.height > view.frame.width
 	}
+	var isZoomed: Bool = false
 	
 	// rotation support setup
 	override var shouldAutorotate: Bool {
@@ -56,12 +57,12 @@ class ViewController: UIViewController, UIScrollViewDelegate {
 	
 	override func viewDidLoad() {
 		super.viewDidLoad()
-		imageView.image = #imageLiteral(resourceName: "iphoneResolution")
+//		imageView.image =
 		scrollView.delegate = self
 		// set VC instance as the delegate of scrollView
 		scrollView.alwaysBounceHorizontal = true
 		scrollView.contentInsetAdjustmentBehavior = .never
-		// stop system from setting up safe area affects scrollView zoom in landscape
+		// stop system from setting up safe area that affects scrollView zoom in landscape
 		
 		// This is used to force update the imageView frame to match image size
 		if let imageSize = imageView.image?.size {
@@ -83,6 +84,7 @@ class ViewController: UIViewController, UIScrollViewDelegate {
 		scrollView.minimumZoomScale = scale
 		scrollView.setZoomScale(scale, animated: animated)
 		initScale = scale
+		setScrollViewInset()
 	}
 	
 	func getMinScale(for size: CGSize) -> CGFloat {
@@ -93,8 +95,9 @@ class ViewController: UIViewController, UIScrollViewDelegate {
 		let scale = min(widthScale, heightScale)
 		return scale
 	}
-	
+
 	func scrollViewDidZoom(_ scrollView: UIScrollView) {
+		print("currentScale: \(currentScale)")
 		setScrollViewInset()
 	}
 	
@@ -109,10 +112,10 @@ class ViewController: UIViewController, UIScrollViewDelegate {
 	@IBAction func doubleTappedGesture(_ sender: Any) {
 		// remember to use view tap location, as scrollView can give negative numbers
 		let viewTapLocation = doubleTapGesture.location(in: view)
+		print("isZoomed: \(isZoomed)")
 		
 		switch (currentScale - fillScale) {
 		case 0:
-			
 			print("isInPortrait: \(isInPortrait)")
 			print("view.frame.height: \(view.frame.height)")
 			print("view.bounds.height: \(view.bounds.height)")
@@ -134,16 +137,46 @@ class ViewController: UIViewController, UIScrollViewDelegate {
 			// WARNING on scroll view frame: scroll view zooms by applying a scaling transform to the scalable view; do not rely on the frame of a scroll view when doing calculations on transformation
 			
 			scrollView.zoom(to: CGRect(x: (scrollView.contentOffset.x + viewTapLocation.x) / currentScale, y: ( (scrollView.contentOffset.y + viewTapLocation.y) / currentScale ) - ( view.frame.height / 2 ), width: 0, height: view.frame.height), animated: true)
+			
+			isZoomed = true
 
 		case -CGFloat.infinity..<0:
 			// currentScale < fillScale, run fill screen code
+
+			guard isZoomed == false else { fallthrough }
+			
+			print("imageSize: \(imageSize)")
+			print(view.frame)
+			
+			guard imageSize.height >= view.frame.height && imageSize.width >= view.frame.width else { break }
+			
 			if isInPortrait {
-				scrollView.zoom(to: CGRect(x: viewTapLocation.x / currentScale, y: viewTapLocation.y / currentScale, width: 0, height: imageSize.height), animated: true)
+				if imageView.frame.height < view.frame.height {
+					// fill vertically
+					scrollView.zoom(to: CGRect(x: viewTapLocation.x / currentScale, y: viewTapLocation.y / currentScale, width: 0, height: imageSize.height), animated: true)
+				} else if imageView.frame.width < view.frame.width {
+					// fill horizontally for weird pics
+					scrollView.zoom(to: CGRect(x: imageSize.width / 2, y: viewTapLocation.y / currentScale, width: imageSize.width, height: 0), animated: true)
+				}
 			} else if !isInPortrait {
-				scrollView.zoom(to: CGRect(x: viewTapLocation.x / currentScale, y: viewTapLocation.y / currentScale, width: imageSize.width, height: 0), animated: true)
+				if imageView.frame.width < view.frame.width {
+					// fill horizontally
+					scrollView.zoom(to: CGRect(x: viewTapLocation.x / currentScale, y: viewTapLocation.y / currentScale, width: imageSize.width, height: 0), animated: true)
+				} else if imageView.frame.height < view.frame.height {
+					// fill vertically for pano
+					scrollView.zoom(to: CGRect(x: viewTapLocation.x / currentScale, y: viewTapLocation.y / currentScale, width: 0, height: imageSize.height), animated: true)
+				}
 			}
+			
+			isZoomed = true
+			
 		default:
+			
+			guard isZoomed == true else { break }
+			
 			initZoomScale(view.frame.size, animated: true)
+			
+			isZoomed = false
 		}
 	}
 	
@@ -163,9 +196,13 @@ class ViewController: UIViewController, UIScrollViewDelegate {
 			scrollView.minimumZoomScale = scale
 		}
 		
-		var shouldKeepCenter: Bool {
+		var isScaleGreaterThanFill: Bool {
+			// note that fillScale here is calculated using the new orientation
+			//	otherwise use "let isScaleGreaterThanFill: Bool = currentScale > fillScale"
 			return currentScale > fillScale
 		}
+		print("isScaleGreaterThanFill: \(isScaleGreaterThanFill)")
+		
 		let oldOffsetX = scrollView.contentOffset.x
 		let oldOffsetY = scrollView.contentOffset.y
 		let oldViewFrameWidth = view.frame.width
@@ -174,53 +211,78 @@ class ViewController: UIViewController, UIScrollViewDelegate {
 		coordinator.animate(alongsideTransition: { (vcTransitionCoordinateContext) in
 
 			// during rotation
-			
 			// view.frame has already been rotated
 
-			print("should keep center: \(shouldKeepCenter)")
-			guard shouldKeepCenter else {return}
+			// maintain same view center point after rotation
 			
-			DispatchQueue.main.async {
-				self.view.layoutSubviews()
-				self.view.layoutIfNeeded()
-				
-				print(self.view.frame.width)
-				print(self.view.frame.height)
-
-				let newOffsetX = oldOffsetX + ( oldViewFrameWidth - self.view.frame.width ) / 2
-				let newOffsetY = oldOffsetY + ( oldViewFrameHeight - self.view.frame.height ) / 2
-				let maxOffsetX = self.imageSize.width * self.currentScale - self.view.frame.width
-				let maxOffsetY = self.imageSize.height * self.currentScale - self.view.frame.height
-
-				var setX: CGFloat {
-					if newOffsetX < 0 {
-						return 0
-					} else if newOffsetX > maxOffsetX {
-						return maxOffsetX
-					} else {
-						return newOffsetX
-					}
+			guard isScaleGreaterThanFill else {return}
+			
+			let newTargetOffsetX = oldOffsetX + ( oldViewFrameWidth - self.view.frame.width ) / 2
+			let newTargetOffsetY = oldOffsetY + ( oldViewFrameHeight - self.view.frame.height ) / 2
+			// have to calculate max offset, otherwise offset too much and there will be a black edge on the right / at the bottom
+			let maxOffsetX = self.imageSize.width * self.currentScale - self.view.frame.width
+			let maxOffsetY = self.imageSize.height * self.currentScale - self.view.frame.height
+			
+			var setX: CGFloat {
+				if newTargetOffsetX < 0 {
+					return 0
+				} else if newTargetOffsetX > maxOffsetX {
+					return maxOffsetX
+				} else {
+					return newTargetOffsetX
 				}
-
-				var setY: CGFloat {
-					if newOffsetY < 0 {
-						return 0
-					} else if newOffsetY > maxOffsetY {
-						return maxOffsetY
-					} else {
-						return newOffsetY
-					}
-				}
-
-				let newOffsetPoint = CGPoint(x: setX, y: setY)
-				self.scrollView.setContentOffset(newOffsetPoint, animated: true)
-
-//				self.setScrollViewInset()
 			}
+			
+			var setY: CGFloat {
+				if newTargetOffsetY < 0 {
+					return 0
+				} else if newTargetOffsetY > maxOffsetY {
+					return maxOffsetY
+				} else {
+					return newTargetOffsetY
+				}
+			}
+			
+			let newOffsetPoint = CGPoint(x: setX, y: setY)
+			self.scrollView.setContentOffset(newOffsetPoint, animated: true)
+			
 		}) { (vcTransitionCoordinateContext) in
 	
 			// after rotation
 			
+			// experimental support for maintaining center after rotation when fill scale is calculated using old orientation
+
+//			self.scrollView.contentInset = UIEdgeInsetsMake(0, 0, 0, 0)
+//			self.setScrollViewInset()
+//			self.scrollView.layoutSubviews()
+			
 		}
 	}
+
+	// DEBUG
+	
+	@IBAction func singleTappedGesture(_ sender: Any) {
+//		switch imageView.image {
+//		case #imageLiteral(resourceName: "TestPic01")?:
+//			imageView.image = #imageLiteral(resourceName: "TestPic02")
+//		case #imageLiteral(resourceName: "TestPic02")?:
+//			imageView.image = #imageLiteral(resourceName: "TestPic03")
+//		default:
+//			imageView.image? = #imageLiteral(resourceName: "TestPic01")
+//		}
+//		initZoomScale(view.frame.size, animated: false)
+//		print(imageView.bounds.width)
+//		setScrollViewInset()
+//		view.layoutIfNeeded()
+	}
+	
+	//	func scrollViewDidEndZooming(_ scrollView: UIScrollView, with view: UIView?, atScale scale: CGFloat) {
+	//		print("currentScale: \(currentScale)")
+	//	}
+	//
+		func scrollViewDidScroll(_ scrollView: UIScrollView) {
+			print("contentOffset: \(scrollView.contentOffset)")
+			print("currentScale: \(currentScale)")
+			print("fillScale: \(fillScale)")
+		}
 }
