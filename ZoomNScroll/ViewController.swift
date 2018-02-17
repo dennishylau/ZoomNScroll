@@ -110,6 +110,10 @@ class ViewController: UIViewController, UIScrollViewDelegate {
 	}
 	
 	@IBAction func doubleTappedGesture(_ sender: Any) {
+		
+		// block off zoom for images that are init at scale > 1
+		guard imageSize.height >= view.frame.height || imageSize.width >= view.frame.width else { return }
+		
 		// remember to use view tap location, as scrollView can give negative numbers
 		let viewTapLocation = doubleTapGesture.location(in: view)
 		print("isZoomed: \(isZoomed)")
@@ -125,7 +129,7 @@ class ViewController: UIViewController, UIScrollViewDelegate {
 			print("imageView.bounds.height: \(imageView.bounds.height)")
 			print("imageSize.height: \(imageSize.height)")
 			
-			// run deep zoom code
+			// currently at fill scale, run deep zoom code
 			guard imageSize.width > view.frame.width ||
 				imageSize.height > view.frame.width
 				else { fallthrough }
@@ -142,13 +146,22 @@ class ViewController: UIViewController, UIScrollViewDelegate {
 
 		case -CGFloat.infinity..<0:
 			// currentScale < fillScale, run fill screen code
-
+			
 			guard isZoomed == false else { fallthrough }
 			
 			print("imageSize: \(imageSize)")
 			print(view.frame)
-			
-			guard imageSize.height >= view.frame.height && imageSize.width >= view.frame.width else { break }
+
+			guard imageSize.height >= view.frame.height && imageSize.width >= view.frame.width else {
+				
+				// when image size is smaller than screen resolution on the filling axis, set scale 1
+				
+				scrollView.zoom(to: CGRect(x: (scrollView.contentOffset.x + viewTapLocation.x) / currentScale, y: ( (scrollView.contentOffset.y + viewTapLocation.y) / currentScale ) - ( view.frame.height / 2 ), width: 0, height: view.frame.height), animated: true)
+				
+				isZoomed = true
+				
+				break
+			}
 			
 			if isInPortrait {
 				if imageView.frame.height < view.frame.height {
@@ -156,7 +169,7 @@ class ViewController: UIViewController, UIScrollViewDelegate {
 					scrollView.zoom(to: CGRect(x: viewTapLocation.x / currentScale, y: viewTapLocation.y / currentScale, width: 0, height: imageSize.height), animated: true)
 				} else if imageView.frame.width < view.frame.width {
 					// fill horizontally for weird pics
-					scrollView.zoom(to: CGRect(x: imageSize.width / 2, y: viewTapLocation.y / currentScale, width: imageSize.width, height: 0), animated: true)
+					scrollView.zoom(to: CGRect(x: viewTapLocation.x / currentScale, y: viewTapLocation.y / currentScale, width: imageSize.width, height: 0), animated: true)
 				}
 			} else if !isInPortrait {
 				if imageView.frame.width < view.frame.width {
