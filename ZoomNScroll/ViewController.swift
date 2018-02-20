@@ -75,10 +75,25 @@ class ViewController: UIViewController, UIScrollViewDelegate {
 	override func viewDidLayoutSubviews() {
 		// This is the trick. Gets called everytime orientation changes to set inset.
 		super.viewDidLayoutSubviews()
+		// return to default zoom when rotated if imageView smaller than frame
+		if view.frame.width >= imageView.frame.width &&
+			view.frame.height >= imageView.frame.height {
+			resetImageScale()
+		} else {
+			imageView.bounds.size = imageSize
+			setScrollViewInset()
+			view.layoutIfNeeded()
+		}
+	}
+
+	func resetImageScale() {
+		// if image is not scaled correctly, try resetting bounds
+		imageView.bounds.size = imageSize
+		initZoomScale(view.frame.size, animated: false)
 		setScrollViewInset()
 		view.layoutIfNeeded()
 	}
-
+	
 	func initZoomScale(_ size: CGSize, animated: Bool) {
 		let scale = getMinScale(for: size)
 		scrollView.minimumZoomScale = scale
@@ -228,7 +243,8 @@ class ViewController: UIViewController, UIScrollViewDelegate {
 
 			// maintain same view center point after rotation
 			
-			guard isScaleGreaterThanFill else {return}
+//			should not have to guard anymore with the !isScaleGreaterThanFill logic
+//			guard isScaleGreaterThanFill else {return}
 			
 			let newTargetOffsetX = oldOffsetX + ( oldViewFrameWidth - self.view.frame.width ) / 2
 			let newTargetOffsetY = oldOffsetY + ( oldViewFrameHeight - self.view.frame.height ) / 2
@@ -236,39 +252,34 @@ class ViewController: UIViewController, UIScrollViewDelegate {
 			let maxOffsetX = self.imageSize.width * self.currentScale - self.view.frame.width
 			let maxOffsetY = self.imageSize.height * self.currentScale - self.view.frame.height
 			
-			var setX: CGFloat {
-				if newTargetOffsetX < 0 {
-					return 0
-				} else if newTargetOffsetX > maxOffsetX {
-					return maxOffsetX
-				} else {
-					return newTargetOffsetX
-				}
-			}
+			var setX: CGFloat
+			var setY: CGFloat
 			
-			var setY: CGFloat {
-				if newTargetOffsetY < 0 {
-					return 0
-				} else if newTargetOffsetY > maxOffsetY {
-					return maxOffsetY
+			if isScaleGreaterThanFill {
+				if newTargetOffsetX < 0 {
+					setX = 0
+				} else if newTargetOffsetX > maxOffsetX {
+					setX = maxOffsetX
 				} else {
-					return newTargetOffsetY
+					setX = newTargetOffsetX
 				}
+				
+				if newTargetOffsetY < 0 {
+					setY = 0
+				} else if newTargetOffsetY > maxOffsetY {
+					setY = maxOffsetY
+				} else {
+					setY = newTargetOffsetY
+				}
+			} else {
+				setX = maxOffsetX / 2
+				setY = maxOffsetY / 2
 			}
 			
 			let newOffsetPoint = CGPoint(x: setX, y: setY)
 			self.scrollView.setContentOffset(newOffsetPoint, animated: true)
-			
 		}) { (vcTransitionCoordinateContext) in
-	
 			// after rotation
-			
-			// experimental support for maintaining center after rotation when fill scale is calculated using old orientation
-
-//			self.scrollView.contentInset = UIEdgeInsetsMake(0, 0, 0, 0)
-//			self.setScrollViewInset()
-//			self.scrollView.layoutSubviews()
-			
 		}
 	}
 
