@@ -273,8 +273,29 @@ class ViewController: UIViewController, UIScrollViewDelegate {
 				}
 			} else {
 				// we have to allow these values to be negative for inset to work somehow
-				setX = maxOffsetX / 2
-				setY = maxOffsetY / 2
+//				maxOffset / 2 is used to center
+//				setX = maxOffsetX / 2
+//				setY = maxOffsetY / 2
+				
+				if self.isInPortrait {
+					if newTargetOffsetX < 0 {
+						setX = maxOffsetX / 2
+					} else if newTargetOffsetX > maxOffsetX {
+						setX = maxOffsetX / 2
+					} else {
+						setX = newTargetOffsetX
+					}
+					setY = maxOffsetY / 2
+				} else {
+					setX = maxOffsetX / 2
+					if newTargetOffsetY < 0 {
+						setY = maxOffsetY / 2
+					} else if newTargetOffsetY > maxOffsetY {
+						setY = maxOffsetY / 2
+					} else {
+						setY = newTargetOffsetY
+					}
+				}
 			}
 			
 			let newOffsetPoint = CGPoint(x: setX, y: setY)
