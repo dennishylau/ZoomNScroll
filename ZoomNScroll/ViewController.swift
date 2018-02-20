@@ -272,8 +272,8 @@ class ViewController: UIViewController, UIScrollViewDelegate {
 					setY = newTargetOffsetY
 				}
 			} else {
-				setX = maxOffsetX / 2 > 0 ? maxOffsetX / 2 : 0
-				setY = maxOffsetY / 2 > 0 ? maxOffsetY / 2 : 0
+				setX = maxOffsetX / 2
+				setY = maxOffsetY / 2
 			}
 			
 			let newOffsetPoint = CGPoint(x: setX, y: setY)
