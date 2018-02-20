@@ -224,12 +224,12 @@ class ViewController: UIViewController, UIScrollViewDelegate {
 			scrollView.minimumZoomScale = scale
 		}
 		
-		var isScaleGreaterThanFill: Bool {
+		var canCurrentScaleFill: Bool {
 			// note that fillScale here is calculated using the new orientation
 			//	otherwise use "let isScaleGreaterThanFill: Bool = currentScale > fillScale"
-			return currentScale > fillScale
+			return currentScale >= fillScale
 		}
-		print("isScaleGreaterThanFill: \(isScaleGreaterThanFill)")
+		print("canCurrentScaleFill: \(canCurrentScaleFill)")
 		
 		let oldOffsetX = scrollView.contentOffset.x
 		let oldOffsetY = scrollView.contentOffset.y
@@ -255,7 +255,7 @@ class ViewController: UIViewController, UIScrollViewDelegate {
 			var setX: CGFloat
 			var setY: CGFloat
 			
-			if isScaleGreaterThanFill {
+			if canCurrentScaleFill {
 				if newTargetOffsetX < 0 {
 					setX = 0
 				} else if newTargetOffsetX > maxOffsetX {
@@ -272,6 +272,7 @@ class ViewController: UIViewController, UIScrollViewDelegate {
 					setY = newTargetOffsetY
 				}
 			} else {
+				// we have to allow these values to be negative for inset to work somehow
 				setX = maxOffsetX / 2
 				setY = maxOffsetY / 2
 			}
